@@ -1,68 +1,86 @@
 package blockchain
 
-// BlockChain represents a sequence of blocks
-type BlockChain struct {
-	// A collection of blocks in the blockchain
-	Blocks []*Block
-}
+import (
+	"bytes"
+	"encoding/gob"
+	"log"
+)
 
-// Block represents a single block in the blockchain
+// Block represents a block in the blockchain.
 type Block struct {
-	// Hash of the block's data and previous hash
+	// Hash of the block
 	Hash     []byte
 	// Data stored in the block
 	Data     []byte
 	// Hash of the previous block
 	PrevHash []byte
-	// A nonce value used for proof of work
+	// Nonce value used for proof of work
 	Nonce    int
 }
 
-// CreateBlock creates a new block with given data and previous hash
+// CreateBlock creates a new block with the provided data and previous hash.
 func CreateBlock(data string, prevHash []byte) *Block {
-
-	// Initialize a new block with data, previous hash, and nonce set to 0
+	// Initialize a new block
 	block := &Block{[]byte{}, []byte(data), prevHash, 0}
-
-	// Create a proof of work instance for the block
+	// Create a proof of work instance
 	pow := NewProof(block)
-
-	// Perform proof of work computation
+	// Calculate the nonce and hash using proof of work
 	nonce, hash := pow.Run()
 
-	// Set the computed hash to the block's hash
+	// Set the block's hash
 	block.Hash = hash[:]
-
-	// Set the computed nonce to the block's nonce
+	// Set the block's nonce
 	block.Nonce = nonce
 
-	// Return the created block with updated hash and nonce
+	// Return the created block
 	return block
 }
 
-// AddBlock appends a new block with given data to the blockchain
-func (chain *BlockChain) AddBlock(data string) {
-
-	// Get the most recent block in the chain
-	prevBlock := chain.Blocks[len(chain.Blocks)-1]
-
-	// Create a new block using provided data and hash of previous block
-	new := CreateBlock(data, prevBlock.Hash)
-
-	// Append the new block to the blockchain
-	chain.Blocks = append(chain.Blocks, new)
-}
-
-// Genesis creates the first block with initial data and no previous hash
+// Genesis returns the genesis block of the blockchain
 func Genesis() *Block {
-
-	// Create the first block with predefined data and empty previous hash
-	return CreateBlock("Starting...", []byte{})
+	// Create the genesis block with empty data and hash
+	return CreateBlock("Genesis", []byte{})
 }
 
-// InitBlockChain initializes a new blockchain with the genesis block
-func InitBlockChain() *BlockChain {
+// Serialize encodes a block into a byte slice.
+func (b *Block) Serialize() []byte {
+	// Create a buffer to store the serialized data
+	var res bytes.Buffer
+	// Initialize a new encoder with the buffer
+	encoder := gob.NewEncoder(&res)
 
-	// Create a new blockchain with the genesis block
-	return &BlockChain{[]*Block{Genesis()}}
+	// Encode the block into the buffer
+	err := encoder.Encode(b)
+
+	// Handle any encoding errors
+	Handle(err)
+
+	// Return the serialized data as a byte slice
+	return res.Bytes()
+}
+
+// Deserialize decodes a byte slice into a block.
+func Deserialize(data []byte) *Block {
+	// Create a new block instance
+	var block Block
+
+	// Initialize a new decoder with the byte slice
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+
+	// Decode the data into the block instance
+	err := decoder.Decode(&block)
+
+	// Handle any decoding errors
+	Handle(err)
+
+	// Return the decoded block instance
+	return &block
+}
+
+// Handle logs and panics if an error is provided.
+func Handle(err error) {
+	if err != nil {
+		// Log the error and panic to halt program execution
+		log.Panic(err)
+	}
 }
