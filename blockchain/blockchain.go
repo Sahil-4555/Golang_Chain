@@ -1,123 +1,234 @@
 package blockchain
 
 import (
+	"encoding/hex"
 	"fmt"
-	"github.com/dgraph-io/badger" 
-	"github.com/dgraph-io/badger/options" 
+	"os"
+	"runtime"
+
+	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/options"
 )
 
 const (
-	dbPath = "./tmp/blocks" // Define the path for the database files
+	dbPath      = "./tmp/blocks"
+	dbFile      = "./tmp/blocks/MANIFEST"
+	genesisData = "First Transaction from Genesis"
 )
 
-// BlockChain represents the blockchain.
 type BlockChain struct {
-	LastHash []byte      // Hash of the last block in the chain
-	Database *badger.DB  // Badger database instance
+	LastHash []byte
+	Database *badger.DB
 }
 
-// BlockChainIterator helps iterate through the blockchain.
 type BlockChainIterator struct {
-	CurrentHash []byte      // Current block's hash being iterated
-	Database    *badger.DB  // Badger database instance
+	CurrentHash []byte
+	Database    *badger.DB
 }
 
-// InitBlockChain initializes and returns a new blockchain instance.
-func InitBlockChain() *BlockChain {
+func DBexists() bool {
+	if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
+}
+
+func ContinueBlockChain(address string) *BlockChain {
+	if DBexists() == false {
+		fmt.Println("No existing blockchain found, create one!")
+		runtime.Goexit()
+	}
+
 	var lastHash []byte
 
-	// Configure Badger database options
 	opts := badger.DefaultOptions
 	opts.Dir = dbPath
 	opts.ValueDir = dbPath
 	opts.Truncate = true // Truncate the value log
 	opts.ValueLogLoadingMode = options.FileIO // Use FileIO mode for value log
 
-	// Open Badger database with specified options
 	db, err := badger.Open(opts)
-	Handle(err) // Handle any errors
+	Handle(err)
 
-	// Update the database transaction to set up the genesis block if not present
 	err = db.Update(func(txn *badger.Txn) error {
-		if _, err := txn.Get([]byte("lh")); err == badger.ErrKeyNotFound {
-			fmt.Println("No existing blockchain found")
-			genesis := Genesis() // Create the genesis block
-			fmt.Println("Genesis block created")
-			err = txn.Set(genesis.Hash, genesis.Serialize()) // Store the serialized genesis block
-			Handle(err) // Handle any errors
-			err = txn.Set([]byte("lh"), genesis.Hash) // Update the last hash key
+		item, err := txn.Get([]byte("lh"))
+		Handle(err)
+		lastHash, err = item.Value()
 
-			lastHash = genesis.Hash // Set the last hash to the genesis block's hash
-
-			return err
-		} else {
-			item, err := txn.Get([]byte("lh")) // Retrieve the last hash from the database
-			Handle(err) // Handle any errors
-			lastHash, err = item.Value() // Get the value of the last hash
-			return err // Return any errors
-		}
+		return err
 	})
+	Handle(err)
 
-	Handle(err) // Handle any errors
+	chain := BlockChain{lastHash, db}
 
-	// Create a blockchain instance with the last hash and the database
-	blockchain := BlockChain{lastHash, db}
-	return &blockchain // Return a pointer to the blockchain instance
+	return &chain
 }
 
-// AddBlock adds a new block to the blockchain.
-func (chain *BlockChain) AddBlock(data string) {
+func InitBlockChain(address string) *BlockChain {
 	var lastHash []byte
 
-	// Access the database in view mode to retrieve the last hash
-	err := chain.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte("lh")) // Retrieve the last hash from the database
-		Handle(err) // Handle any errors
-		lastHash, err = item.Value() // Get the value of the last hash
+	if DBexists() {
+		fmt.Println("Blockchain already exists")
+		runtime.Goexit()
+	}
 
-		return err // Return any errors
+	opts := badger.DefaultOptions
+	opts.Dir = dbPath
+	opts.ValueDir = dbPath
+	opts.Truncate = true // Truncate the value log
+	opts.ValueLogLoadingMode = options.FileIO // Use FileIO mode for value log
+
+	db, err := badger.Open(opts)
+	Handle(err)
+
+	err = db.Update(func(txn *badger.Txn) error {
+		cbtx := CoinbaseTx(address, genesisData)
+		genesis := Genesis(cbtx)
+		fmt.Println("Genesis created")
+		err = txn.Set(genesis.Hash, genesis.Serialize())
+		Handle(err)
+		err = txn.Set([]byte("lh"), genesis.Hash)
+
+		lastHash = genesis.Hash
+
+		return err
+
 	})
-	Handle(err) // Handle any errors
 
-	// Create a new block with the provided data and last hash
-	newBlock := CreateBlock(data, lastHash)
+	Handle(err)
 
-	// Update the database in a transaction to add the new block
-	err = chain.Database.Update(func(txn *badger.Txn) error {
-		err := txn.Set(newBlock.Hash, newBlock.Serialize()) // Store the serialized new block
-		Handle(err) // Handle any errors
-		err = txn.Set([]byte("lh"), newBlock.Hash) // Update the last hash key
-
-		chain.LastHash = newBlock.Hash // Update the last hash in the blockchain
-
-		return err // Return any errors
-	})
-	Handle(err) // Handle any errors
+	blockchain := BlockChain{lastHash, db}
+	return &blockchain
 }
 
-// Iterator returns a new iterator for the blockchain.
+func (chain *BlockChain) AddBlock(transactions []*Transaction) {
+	var lastHash []byte
+
+	err := chain.Database.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte("lh"))
+		Handle(err)
+		lastHash, err = item.Value()
+
+		return err
+	})
+	Handle(err)
+
+	newBlock := CreateBlock(transactions, lastHash)
+
+	err = chain.Database.Update(func(txn *badger.Txn) error {
+		err := txn.Set(newBlock.Hash, newBlock.Serialize())
+		Handle(err)
+		err = txn.Set([]byte("lh"), newBlock.Hash)
+
+		chain.LastHash = newBlock.Hash
+
+		return err
+	})
+	Handle(err)
+}
+
 func (chain *BlockChain) Iterator() *BlockChainIterator {
 	iter := &BlockChainIterator{chain.LastHash, chain.Database}
 
-	return iter // Return the iterator
+	return iter
 }
 
-// Next returns the next block in the blockchain iterator.
 func (iter *BlockChainIterator) Next() *Block {
 	var block *Block
 
-	// Access the database in view mode to retrieve the current block
 	err := iter.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(iter.CurrentHash) // Retrieve the block by its hash
-		Handle(err) // Handle any errors
-		encodedBlock, err := item.ValueCopy(nil) // Get the serialized block
-		block = Deserialize(encodedBlock) // Deserialize the block from the value
+		item, err := txn.Get(iter.CurrentHash)
+		Handle(err)
+		encodedBlock, err := item.Value()
+		block = Deserialize(encodedBlock)
 
-		return err // Return any errors
+		return err
 	})
-	Handle(err) // Handle any errors
+	Handle(err)
 
-	iter.CurrentHash = block.PrevHash // Update the current hash to the previous hash
+	iter.CurrentHash = block.PrevHash
 
-	return block // Return the retrieved block
+	return block
+}
+
+func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
+	var unspentTxs []Transaction
+
+	spentTXOs := make(map[string][]int)
+
+	iter := chain.Iterator()
+
+	for {
+		block := iter.Next()
+
+		for _, tx := range block.Transactions {
+			txID := hex.EncodeToString(tx.ID)
+
+		Outputs:
+			for outIdx, out := range tx.Outputs {
+				if spentTXOs[txID] != nil {
+					for _, spentOut := range spentTXOs[txID] {
+						if spentOut == outIdx {
+							continue Outputs
+						}
+					}
+				}
+				if out.CanBeUnlocked(address) {
+					unspentTxs = append(unspentTxs, *tx)
+				}
+			}
+			if tx.IsCoinbase() == false {
+				for _, in := range tx.Inputs {
+					if in.CanUnlock(address) {
+						inTxID := hex.EncodeToString(in.ID)
+						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Out)
+					}
+				}
+			}
+		}
+
+		if len(block.PrevHash) == 0 {
+			break
+		}
+	}
+	return unspentTxs
+}
+
+func (chain *BlockChain) FindUTXO(address string) []TxOutput {
+	var UTXOs []TxOutput
+	unspentTransactions := chain.FindUnspentTransactions(address)
+
+	for _, tx := range unspentTransactions {
+		for _, out := range tx.Outputs {
+			if out.CanBeUnlocked(address) {
+				UTXOs = append(UTXOs, out)
+			}
+		}
+	}
+	return UTXOs
+}
+
+func (chain *BlockChain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
+	unspentOuts := make(map[string][]int)
+	unspentTxs := chain.FindUnspentTransactions(address)
+	accumulated := 0
+
+Work:
+	for _, tx := range unspentTxs {
+		txID := hex.EncodeToString(tx.ID)
+
+		for outIdx, out := range tx.Outputs {
+			if out.CanBeUnlocked(address) && accumulated < amount {
+				accumulated += out.Value
+				unspentOuts[txID] = append(unspentOuts[txID], outIdx)
+
+				if accumulated >= amount {
+					break Work
+				}
+			}
+		}
+	}
+
+	return accumulated, unspentOuts
 }
