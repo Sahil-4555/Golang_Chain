@@ -1,13 +1,13 @@
 package blockchain
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
-	"fmt"
-	"log"
-	"math"
-	"math/big"
+	"bytes"         
+	"crypto/sha256" 
+	"encoding/binary" 
+	"fmt" 
+	"log" 
+	"math" 
+	"math/big" 
 )
 
 // Difficulty level for mining
@@ -87,7 +87,6 @@ func ToHex(num int64) []byte {
 	err := binary.Write(buff, binary.BigEndian, num)
 	if err != nil {
 		log.Panic(err) // Handle any errors by panicking
-
 	}
 
 	return buff.Bytes()
