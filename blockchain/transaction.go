@@ -1,35 +1,20 @@
 package blockchain
 
 import (
-	"bytes"         
-	"crypto/sha256" 
-	"encoding/gob" 
-	"encoding/hex" 
-	"fmt" 
-	"log" 
+	"bytes"
+	"crypto/sha256"
+	"encoding/gob"
+	"encoding/hex"
+	"fmt"
+	"log"
 )
 
-// Transaction represents a transaction within the blockchain
 type Transaction struct {
-	ID      []byte     // The unique ID of the transaction
-	Inputs  []TxInput  // The list of input transactions
-	Outputs []TxOutput // The list of output transactions
+	ID      []byte
+	Inputs  []TxInput
+	Outputs []TxOutput
 }
 
-// TxOutput represents an output of a transaction
-type TxOutput struct {
-	Value  int    // The value of the transaction output
-	PubKey string // The public key associated with the output
-}
-
-// TxInput represents an input to a transaction
-type TxInput struct {
-	ID  []byte // The ID of the transaction input
-	Out int    // The output index of the input
-	Sig string // The signature of the input
-}
-
-// SetID generates a unique ID for the transaction based on its content
 func (tx *Transaction) SetID() {
 	var encoded bytes.Buffer
 	var hash [32]byte
@@ -42,7 +27,6 @@ func (tx *Transaction) SetID() {
 	tx.ID = hash[:]
 }
 
-// CoinbaseTx creates a special coinbase transaction to reward miners
 func CoinbaseTx(to, data string) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Coins to %s", to)
@@ -57,7 +41,6 @@ func CoinbaseTx(to, data string) *Transaction {
 	return &tx
 }
 
-// NewTransaction creates a new transaction between two addresses
 func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
@@ -90,17 +73,6 @@ func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction
 	return &tx
 }
 
-// IsCoinbase checks if a transaction is a coinbase transaction
 func (tx *Transaction) IsCoinbase() bool {
 	return len(tx.Inputs) == 1 && len(tx.Inputs[0].ID) == 0 && tx.Inputs[0].Out == -1
-}
-
-// CanUnlock checks if a transaction input can be unlocked using the provided data
-func (in *TxInput) CanUnlock(data string) bool {
-	return in.Sig == data
-}
-
-// CanBeUnlocked checks if a transaction output can be unlocked using the provided data
-func (out *TxOutput) CanBeUnlocked(data string) bool {
-	return out.PubKey == data
 }
