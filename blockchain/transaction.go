@@ -9,12 +9,14 @@ import (
 	"log"
 )
 
+// Transaction represents a single transaction in the blockchain.
 type Transaction struct {
-	ID      []byte
-	Inputs  []TxInput
-	Outputs []TxOutput
+	ID      []byte      // Unique ID for the transaction
+	Inputs  []TxInput   // List of inputs (sources) for the transaction
+	Outputs []TxOutput  // List of outputs (destinations) for the transaction
 }
 
+// SetID calculates and sets the unique ID for the transaction.
 func (tx *Transaction) SetID() {
 	var encoded bytes.Buffer
 	var hash [32]byte
@@ -27,6 +29,7 @@ func (tx *Transaction) SetID() {
 	tx.ID = hash[:]
 }
 
+// CoinbaseTx creates a special coinbase transaction that rewards miners with coins.
 func CoinbaseTx(to, data string) *Transaction {
 	if data == "" {
 		data = fmt.Sprintf("Coins to %s", to)
@@ -41,16 +44,19 @@ func CoinbaseTx(to, data string) *Transaction {
 	return &tx
 }
 
+// NewTransaction creates a new regular transaction between wallet addresses.
 func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
+	// Find spendable outputs for the sender's address and calculate available funds (acc).
 	acc, validOutputs := chain.FindSpendableOutputs(from, amount)
 
 	if acc < amount {
-		log.Panic("Error: not enough funds")
+		log.Panic("Error: not enough funds") // Raise an error if the sender doesn't have enough funds
 	}
 
+	// Iterate over valid outputs and create inputs for the transaction.
 	for txid, outs := range validOutputs {
 		txID, err := hex.DecodeString(txid)
 		Handle(err)
@@ -61,6 +67,7 @@ func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction
 		}
 	}
 
+	// Create an output for the recipient and, if needed, a change output back to the sender.
 	outputs = append(outputs, TxOutput{amount, to})
 
 	if acc > amount {
@@ -73,6 +80,7 @@ func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction
 	return &tx
 }
 
+// IsCoinbase checks if a transaction is a coinbase transaction (mining reward).
 func (tx *Transaction) IsCoinbase() bool {
 	return len(tx.Inputs) == 1 && len(tx.Inputs[0].ID) == 0 && tx.Inputs[0].Out == -1
 }

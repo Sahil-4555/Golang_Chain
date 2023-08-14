@@ -12,8 +12,10 @@ import (
 	"github.com/Sahil-4555/Golang_Chain/wallet"
 )
 
+// CommandLine represents the command line interface struct.
 type CommandLine struct{}
 
+// printUsage prints the usage guide for the command line.
 func (cli *CommandLine) printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println(" getbalance -address ADDRESS - get the balance for an address")
@@ -24,6 +26,7 @@ func (cli *CommandLine) printUsage() {
 	fmt.Println(" listaddresses - Lists the addresses in our wallet file")
 }
 
+// validateArgs validates the command line arguments.
 func (cli *CommandLine) validateArgs() {
 	if len(os.Args) < 2 {
 		cli.printUsage()
@@ -31,6 +34,7 @@ func (cli *CommandLine) validateArgs() {
 	}
 }
 
+// listAddresses lists the addresses in the wallet.
 func (cli *CommandLine) listAddresses() {
 	wallets, _ := wallet.CreateWallets()
 	addresses := wallets.GetAllAddresses()
@@ -40,6 +44,7 @@ func (cli *CommandLine) listAddresses() {
 	}
 }
 
+// createWallet creates a new wallet and prints the new address.
 func (cli *CommandLine) createWallet() {
 	wallets, _ := wallet.CreateWallets()
 	address := wallets.AddWallet()
@@ -48,6 +53,7 @@ func (cli *CommandLine) createWallet() {
 	fmt.Printf("New address is: %s\n", address)
 }
 
+// printChain prints the blocks in the blockchain.
 func (cli *CommandLine) printChain() {
 	chain := blockchain.ContinueBlockChain("")
 	defer chain.Database.Close()
@@ -68,12 +74,14 @@ func (cli *CommandLine) printChain() {
 	}
 }
 
+// createBlockChain creates a new blockchain with a given address.
 func (cli *CommandLine) createBlockChain(address string) {
 	chain := blockchain.InitBlockChain(address)
 	chain.Database.Close()
 	fmt.Println("Finished!")
 }
 
+// getBalance retrieves the balance of a given address.
 func (cli *CommandLine) getBalance(address string) {
 	chain := blockchain.ContinueBlockChain(address)
 	defer chain.Database.Close()
@@ -88,6 +96,7 @@ func (cli *CommandLine) getBalance(address string) {
 	fmt.Printf("Balance of %s: %d\n", address, balance)
 }
 
+// send sends coins from one address to another.
 func (cli *CommandLine) send(from, to string, amount int) {
 	chain := blockchain.ContinueBlockChain(from)
 	defer chain.Database.Close()
@@ -97,6 +106,7 @@ func (cli *CommandLine) send(from, to string, amount int) {
 	fmt.Println("Success!")
 }
 
+// Run executes the command line interface.
 func (cli *CommandLine) Run() {
 	cli.validateArgs()
 
@@ -106,7 +116,6 @@ func (cli *CommandLine) Run() {
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 	listAddressesCmd := flag.NewFlagSet("listaddresses", flag.ExitOnError)
-
 
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
 	createBlockchainAddress := createBlockchainCmd.String("address", "", "The address to send genesis block reward to")
@@ -173,6 +182,7 @@ func (cli *CommandLine) Run() {
 	if createWalletCmd.Parsed() {
 		cli.createWallet()
 	}
+
 	if listAddressesCmd.Parsed() {
 		cli.listAddresses()
 	}
