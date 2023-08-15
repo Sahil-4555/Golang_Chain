@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -11,67 +12,80 @@ import (
 )
 
 const (
-	checksumLength = 4    // Length of the checksum in bytes
-	version        = byte(0x00) // Version byte for address
+	checksumLength = 4
+	version        = byte(0x00)
 )
 
-// Wallet represents a cryptocurrency wallet containing private and public keys.
+// Wallet represents a cryptocurrency wallet with private and public keys
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey // Private key of the wallet
-	PublicKey  []byte           // Public key of the wallet
+	PrivateKey ecdsa.PrivateKey
+	PublicKey  []byte
 }
 
-// Address generates and returns the address associated with the wallet.
+// Address generates the address for the wallet using public key hashing
 func (w Wallet) Address() []byte {
-	pubHash := PublicKeyHash(w.PublicKey) // Calculate the public key hash
-	versionedHash := append([]byte{version}, pubHash...) // Add version to the hash
-	checksum := Checksum(versionedHash) // Calculate the checksum
-	fullHash := append(versionedHash, checksum...) // Combine version, hash, and checksum
-	address := Base58Encode(fullHash) // Encode the full hash using Base58 encoding
+	pubHash := PublicKeyHash(w.PublicKey)
 
-	return address // Return the generated address
+	versionedHash := append([]byte{version}, pubHash...)
+	checksum := Checksum(versionedHash)
+
+	fullHash := append(versionedHash, checksum...)
+	address := Base58Encode(fullHash)
+
+	return address
 }
 
-// NewKeyPair generates a new private and public key pair using elliptic curve cryptography.
+// NewKeyPair generates a new private-public key pair using elliptic curve cryptography
 func NewKeyPair() (ecdsa.PrivateKey, []byte) {
-	curve := elliptic.P256() // Use elliptic curve P-256
+	curve := elliptic.P256()
 
-	private, err := ecdsa.GenerateKey(curve, rand.Reader) // Generate a new private key
+	private, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
-		log.Panic(err) // If there's an error, panic with the error message
+		log.Panic(err)
 	}
 
-	pub := append(private.PublicKey.X.Bytes(), private.PublicKey.Y.Bytes()...) // Concatenate X and Y components of the public key
-	return *private, pub // Return the private key and concatenated public key
+	pub := append(private.PublicKey.X.Bytes(), private.PublicKey.Y.Bytes()...)
+	return *private, pub
 }
 
-// MakeWallet creates a new wallet by generating a private and public key pair.
+// MakeWallet creates a new wallet with a private-public key pair
 func MakeWallet() *Wallet {
-	private, public := NewKeyPair() // Generate a new key pair
-	wallet := Wallet{private, public} // Create a new wallet using the keys
+	private, public := NewKeyPair()
+	wallet := Wallet{private, public}
 
-	return &wallet // Return a pointer to the created wallet
+	return &wallet
 }
 
-// PublicKeyHash calculates the hash of the public key using SHA-256 and RIPEMD-160.
+// PublicKeyHash calculates the hash of the public key using SHA-256 and RIPEMD-160
 func PublicKeyHash(pubKey []byte) []byte {
-	pubHash := sha256.Sum256(pubKey) // Hash the public key using SHA-256
+	pubHash := sha256.Sum256(pubKey)
 
-	hasher := ripemd160.New() // Create a new RIPEMD-160 hasher
-	_, err := hasher.Write(pubHash[:]) // Write the hashed public key to the hasher
+	hasher := ripemd160.New()
+	_, err := hasher.Write(pubHash[:])
 	if err != nil {
-		log.Panic(err) // If there's an error, panic with the error message
+		log.Panic(err)
 	}
 
-	publicRipMD := hasher.Sum(nil) // Get the final RIPEMD-160 hash
+	publicRipMD := hasher.Sum(nil)
 
-	return publicRipMD // Return the RIPEMD-160 hash
+	return publicRipMD
 }
 
-// Checksum calculates a checksum for a given payload using double SHA-256 hashing.
+// Checksum calculates a checksum for payload using double SHA-256 hashing
 func Checksum(payload []byte) []byte {
-	firstHash := sha256.Sum256(payload) // Calculate the first hash using SHA-256
-	secondHash := sha256.Sum256(firstHash[:]) // Calculate the second hash using SHA-256
+	firstHash := sha256.Sum256(payload)
+	secondHash := sha256.Sum256(firstHash[:])
 
-	return secondHash[:checksumLength] // Return the first `checksumLength` bytes of the second hash
+	return secondHash[:checksumLength]
+}
+
+// ValidateAddress checks if an address is valid by comparing checksums
+func ValidateAddress(address string) bool {
+	pubKeyHash := Base58Decode([]byte(address))
+	actualChecksum := pubKeyHash[len(pubKeyHash)-checksumLength:]
+	version := pubKeyHash[0]
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-checksumLength]
+	targetChecksum := Checksum(append([]byte{version}, pubKeyHash...))
+
+	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }

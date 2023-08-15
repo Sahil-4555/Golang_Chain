@@ -12,10 +12,10 @@ import (
 	"github.com/Sahil-4555/Golang_Chain/wallet"
 )
 
-// CommandLine represents the command line interface struct.
+// CommandLine represents the command line interface
 type CommandLine struct{}
 
-// printUsage prints the usage guide for the command line.
+// printUsage prints the usage instructions for the CLI
 func (cli *CommandLine) printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println(" getbalance -address ADDRESS - get the balance for an address")
@@ -26,7 +26,7 @@ func (cli *CommandLine) printUsage() {
 	fmt.Println(" listaddresses - Lists the addresses in our wallet file")
 }
 
-// validateArgs validates the command line arguments.
+// validateArgs validates the command line arguments
 func (cli *CommandLine) validateArgs() {
 	if len(os.Args) < 2 {
 		cli.printUsage()
@@ -34,7 +34,7 @@ func (cli *CommandLine) validateArgs() {
 	}
 }
 
-// listAddresses lists the addresses in the wallet.
+// listAddresses lists all addresses in the wallet file
 func (cli *CommandLine) listAddresses() {
 	wallets, _ := wallet.CreateWallets()
 	addresses := wallets.GetAllAddresses()
@@ -44,7 +44,7 @@ func (cli *CommandLine) listAddresses() {
 	}
 }
 
-// createWallet creates a new wallet and prints the new address.
+// createWallet creates a new wallet and prints the address
 func (cli *CommandLine) createWallet() {
 	wallets, _ := wallet.CreateWallets()
 	address := wallets.AddWallet()
@@ -53,7 +53,7 @@ func (cli *CommandLine) createWallet() {
 	fmt.Printf("New address is: %s\n", address)
 }
 
-// printChain prints the blocks in the blockchain.
+// printChain prints the blocks and their information in the blockchain
 func (cli *CommandLine) printChain() {
 	chain := blockchain.ContinueBlockChain("")
 	defer chain.Database.Close()
@@ -62,10 +62,13 @@ func (cli *CommandLine) printChain() {
 	for {
 		block := iter.Next()
 
-		fmt.Printf("Prev. hash: %x\n", block.PrevHash)
 		fmt.Printf("Hash: %x\n", block.Hash)
+		fmt.Printf("Prev. hash: %x\n", block.PrevHash)
 		pow := blockchain.NewProof(block)
 		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
+		for _, tx := range block.Transactions {
+			fmt.Println(tx)
+		}
 		fmt.Println()
 
 		if len(block.PrevHash) == 0 {
@@ -74,20 +77,28 @@ func (cli *CommandLine) printChain() {
 	}
 }
 
-// createBlockChain creates a new blockchain with a given address.
+// createBlockChain creates a new blockchain with the given address
 func (cli *CommandLine) createBlockChain(address string) {
+	if !wallet.ValidateAddress(address) {
+		log.Panic("Address is not Valid")
+	}
 	chain := blockchain.InitBlockChain(address)
 	chain.Database.Close()
 	fmt.Println("Finished!")
 }
 
-// getBalance retrieves the balance of a given address.
+// getBalance gets the balance of an address in the blockchain
 func (cli *CommandLine) getBalance(address string) {
+	if !wallet.ValidateAddress(address) {
+		log.Panic("Address is not Valid")
+	}
 	chain := blockchain.ContinueBlockChain(address)
 	defer chain.Database.Close()
 
 	balance := 0
-	UTXOs := chain.FindUTXO(address)
+	pubKeyHash := wallet.Base58Decode([]byte(address))
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+	UTXOs := chain.FindUTXO(pubKeyHash)
 
 	for _, out := range UTXOs {
 		balance += out.Value
@@ -96,8 +107,14 @@ func (cli *CommandLine) getBalance(address string) {
 	fmt.Printf("Balance of %s: %d\n", address, balance)
 }
 
-// send sends coins from one address to another.
+// send sends a specified amount of coins from one address to another
 func (cli *CommandLine) send(from, to string, amount int) {
+	if !wallet.ValidateAddress(to) {
+		log.Panic("Address is not Valid")
+	}
+	if !wallet.ValidateAddress(from) {
+		log.Panic("Address is not Valid")
+	}
 	chain := blockchain.ContinueBlockChain(from)
 	defer chain.Database.Close()
 
@@ -106,7 +123,7 @@ func (cli *CommandLine) send(from, to string, amount int) {
 	fmt.Println("Success!")
 }
 
-// Run executes the command line interface.
+// Run executes the command line interface based on the provided arguments
 func (cli *CommandLine) Run() {
 	cli.validateArgs()
 
@@ -182,7 +199,6 @@ func (cli *CommandLine) Run() {
 	if createWalletCmd.Parsed() {
 		cli.createWallet()
 	}
-
 	if listAddressesCmd.Parsed() {
 		cli.listAddresses()
 	}
