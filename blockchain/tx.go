@@ -2,58 +2,75 @@ package blockchain
 
 import (
 	"bytes"
+	"encoding/gob"
 
 	"github.com/Sahil-4555/Golang_Chain/wallet"
 )
 
 // TxOutput represents an output in a transaction
 type TxOutput struct {
-	Value      int    // Amount of cryptocurrency in the output
-	PubKeyHash []byte // Hash of the public key used to lock the output
+	Value      int
+	PubKeyHash []byte
+}
+
+// TxOutputs holds a collection of transaction outputs
+type TxOutputs struct {
+	Outputs []TxOutput
 }
 
 // TxInput represents an input in a transaction
 type TxInput struct {
-	ID        []byte // Transaction ID that this input references
-	Out       int    // Index of the output within the referenced transaction
-	Signature []byte // Signature that authorizes spending this input
-	PubKey    []byte // Public key associated with the signature
+	ID        []byte
+	Out       int
+	Signature []byte
+	PubKey    []byte
 }
 
-// UsesKey checks if a transaction input uses a specific public key hash
+// Check if a transaction input uses a specific public key hash
 func (in *TxInput) UsesKey(pubKeyHash []byte) bool {
-	// Calculate the public key hash of the input's public key
 	lockingHash := wallet.PublicKeyHash(in.PubKey)
 
-	// Compare the calculated public key hash with the given public key hash
 	return bytes.Compare(lockingHash, pubKeyHash) == 0
 }
 
-// Lock sets the PubKeyHash of a transaction output using an address
+// Lock a transaction output to a specific address
 func (out *TxOutput) Lock(address []byte) {
-	// Decode the Base58 address to get the public key hash
 	pubKeyHash := wallet.Base58Decode(address)
-
-	// Remove the version byte and checksum to get the actual public key hash
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
-
-	// Set the PubKeyHash of the output to the extracted public key hash
 	out.PubKeyHash = pubKeyHash
 }
 
-// IsLockedWithKey checks if a transaction output is locked with a specific public key hash
+// Check if a transaction output is locked with a specific key
 func (out *TxOutput) IsLockedWithKey(pubKeyHash []byte) bool {
-	// Compare the public key hash of the output with the given public key hash
 	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
 }
 
-// NewTXOutput creates a new transaction output with a specified value and address
+// Create a new transaction output with a specific value and address
 func NewTXOutput(value int, address string) *TxOutput {
-	// Create a new transaction output with the given value and nil PubKeyHash
 	txo := &TxOutput{value, nil}
-
-	// Lock the transaction output using the provided address
 	txo.Lock([]byte(address))
 
 	return txo
+}
+
+// Serialize the transaction outputs
+func (outs TxOutputs) Serialize() []byte {
+	var buffer bytes.Buffer
+
+	encoder := gob.NewEncoder(&buffer)
+	err := encoder.Encode(outs)
+	Handle(err)
+
+	return buffer.Bytes()
+}
+
+// Deserialize transaction outputs from serialized data
+func DeserializeOutputs(data []byte) TxOutputs {
+	var outputs TxOutputs
+
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&outputs)
+	Handle(err)
+
+	return outputs
 }
