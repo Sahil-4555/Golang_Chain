@@ -2,33 +2,31 @@ package blockchain
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/gob"
 	"log"
 )
 
 // Block represents a block in the blockchain
 type Block struct {
-	Hash         []byte         // Hash of the block
-	Transactions []*Transaction // List of transactions included in the block
-	PrevHash     []byte         // Hash of the previous block
-	Nonce        int            // Nonce value for proof-of-work
+	Hash         []byte
+	Transactions []*Transaction
+	PrevHash     []byte
+	Nonce        int
 }
 
-// HashTransactions calculates and returns the hash of all transactions in the block
+// HashTransactions calculates the hash of transactions in the block
 func (b *Block) HashTransactions() []byte {
 	var txHashes [][]byte
-	var txHash [32]byte
 
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.Hash())
+		txHashes = append(txHashes, tx.Serialize())
 	}
-	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+	tree := NewMerkleTree(txHashes)
 
-	return txHash[:]
+	return tree.RootNode.Data
 }
 
-// CreateBlock creates a new block with given transactions and previous hash
+// CreateBlock creates a new block with transactions and previous hash
 func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
 	block := &Block{[]byte{}, txs, prevHash, 0}
 	pow := NewProof(block)
@@ -40,12 +38,12 @@ func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
 	return block
 }
 
-// Genesis creates the first block in the blockchain with a coinbase transaction
+// Genesis creates the first block (genesis block) with a coinbase transaction
 func Genesis(coinbase *Transaction) *Block {
 	return CreateBlock([]*Transaction{coinbase}, []byte{})
 }
 
-// Serialize encodes the block into a byte slice
+// Serialize converts a block into a byte slice
 func (b *Block) Serialize() []byte {
 	var res bytes.Buffer
 	encoder := gob.NewEncoder(&res)
@@ -57,7 +55,7 @@ func (b *Block) Serialize() []byte {
 	return res.Bytes()
 }
 
-// Deserialize decodes a byte slice into a block
+// Deserialize converts a byte slice into a block
 func Deserialize(data []byte) *Block {
 	var block Block
 
@@ -70,7 +68,7 @@ func Deserialize(data []byte) *Block {
 	return &block
 }
 
-// Handle is a helper function to handle errors by logging and panicking
+// Handle handles errors by logging and panicking
 func Handle(err error) {
 	if err != nil {
 		log.Panic(err)
