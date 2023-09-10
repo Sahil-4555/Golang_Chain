@@ -18,14 +18,14 @@ import (
 
 // Constants for database paths and initial data
 const (
-	dbPath      = "./tmp/blocks_%s"
-	genesisData = "First Transaction from Genesis"
+	dbPath      = "./tmp/blocks_%s" // Directory path for database storage
+	genesisData = "First Transaction from Genesis" // Initial data for the genesis block
 )
 
 // BlockChain represents the blockchain data structure
 type BlockChain struct {
-	LastHash []byte
-	Database *badger.DB
+	LastHash []byte  // Hash of the last block in the blockchain
+	Database *badger.DB  // Badger DB instance for storing blockchain data
 }
 
 // Check if the database file exists
@@ -102,6 +102,7 @@ func InitBlockChain(address, nodeId string) *BlockChain {
 	return &blockchain
 }
 
+// AddBlock adds a new block to the blockchain
 func (chain *BlockChain) AddBlock(block *Block) {
 	err := chain.Database.Update(func(txn *badger.Txn) error {
 		if _, err := txn.Get(block.Hash); err == nil {
@@ -133,6 +134,7 @@ func (chain *BlockChain) AddBlock(block *Block) {
 	Handle(err)
 }
 
+// GetBestHeight returns the height of the latest block in the blockchain
 func (chain *BlockChain) GetBestHeight() int {
 	var lastBlock Block
 
@@ -154,6 +156,7 @@ func (chain *BlockChain) GetBestHeight() int {
 	return lastBlock.Height
 }
 
+// GetBlock retrieves a block by its hash
 func (chain *BlockChain) GetBlock(blockHash []byte) (Block, error) {
 	var block Block
 
@@ -174,6 +177,7 @@ func (chain *BlockChain) GetBlock(blockHash []byte) (Block, error) {
 	return block, nil
 }
 
+// GetBlockHashes retrieves hashes of all blocks in the blockchain
 func (chain *BlockChain) GetBlockHashes() [][]byte {
 	var blocks [][]byte
 
@@ -192,7 +196,7 @@ func (chain *BlockChain) GetBlockHashes() [][]byte {
 	return blocks
 }
 
-// AddBlock adds a new block to the blockchain
+// MineBlock mines a new block with provided transactions and adds it to the blockchain
 func (chain *BlockChain) MineBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	var lastHeight int
@@ -204,7 +208,7 @@ func (chain *BlockChain) MineBlock(transactions []*Transaction) *Block {
 		}
 	}
 
-	// Retrieve the last hash from the database
+	// Retrieve the last hash and height from the database
 	err := chain.Database.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte("lh"))
 		Handle(err)
@@ -324,6 +328,7 @@ func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
 	return tx.Verify(prevTXs)
 }
 
+// retry attempts to unlock a Badger database that's already locked
 func retry(dir string, originalOpts badger.Options) (*badger.DB, error) {
 	lockPath := filepath.Join(dir, "LOCK")
 	if err := os.Remove(lockPath); err != nil {
@@ -335,6 +340,7 @@ func retry(dir string, originalOpts badger.Options) (*badger.DB, error) {
 	return db, err
 }
 
+// openDB opens the Badger database and handles locking issues
 func openDB(dir string, opts badger.Options) (*badger.DB, error) {
 	if db, err := badger.Open(opts); err != nil {
 		if strings.Contains(err.Error(), "LOCK") {
