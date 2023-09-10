@@ -1,10 +1,11 @@
 module github.com/Sahil-4555/Golang_Chain
 
-go 1.20
+go 1.18
 
 require (
 	github.com/dgraph-io/badger v1.5.4
 	github.com/mr-tron/base58 v1.2.0
+	github.com/vrecan/death/v3 v3.0.3
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 )
 

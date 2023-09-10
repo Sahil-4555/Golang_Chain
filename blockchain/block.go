@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+	"time"
 )
 
 // Block represents a block in the blockchain
 type Block struct {
+	Timestamp    int64
 	Hash         []byte
 	Transactions []*Transaction
 	PrevHash     []byte
 	Nonce        int
+	Height       int
 }
 
 // HashTransactions calculates the hash of transactions in the block
@@ -27,8 +30,8 @@ func (b *Block) HashTransactions() []byte {
 }
 
 // CreateBlock creates a new block with transactions and previous hash
-func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
-	block := &Block{[]byte{}, txs, prevHash, 0}
+func CreateBlock(txs []*Transaction, prevHash []byte, height int) *Block {
+	block := &Block{time.Now().Unix(), []byte{}, txs, prevHash, 0, height}
 	pow := NewProof(block)
 	nonce, hash := pow.Run()
 
@@ -40,7 +43,7 @@ func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
 
 // Genesis creates the first block (genesis block) with a coinbase transaction
 func Genesis(coinbase *Transaction) *Block {
-	return CreateBlock([]*Transaction{coinbase}, []byte{})
+	return CreateBlock([]*Transaction{coinbase}, []byte{}, 0)
 }
 
 // Serialize converts a block into a byte slice

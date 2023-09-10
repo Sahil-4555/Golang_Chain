@@ -10,88 +10,83 @@ import (
 	"os"
 )
 
-const walletFile = "./tmp/wallets.data" // Path to the wallet data file
+const walletFile = "./tmp/wallets_%s.data"
 
-// Wallets represents a collection of wallets.
 type Wallets struct {
-	Wallets map[string]*Wallet // Map of addresses to wallet pointers
+	Wallets map[string]*Wallet
 }
 
-// CreateWallets creates a new Wallets instance and loads wallets from the file if it exists.
-func CreateWallets() (*Wallets, error) {
-	wallets := Wallets{} // Create a new empty Wallets instance
-	wallets.Wallets = make(map[string]*Wallet) // Initialize the map
+func CreateWallets(nodeId string) (*Wallets, error) {
+	wallets := Wallets{}
+	wallets.Wallets = make(map[string]*Wallet)
 
-	err := wallets.LoadFile() // Load wallets from the file
+	err := wallets.LoadFile(nodeId)
 
-	return &wallets, err // Return a pointer to the Wallets instance and any error
+	return &wallets, err
 }
 
-// AddWallet generates a new wallet, adds it to Wallets, and returns its address.
 func (ws *Wallets) AddWallet() string {
-	wallet := MakeWallet() // Create a new wallet
-	address := fmt.Sprintf("%s", wallet.Address()) // Get the address of the wallet as a string
+	wallet := MakeWallet()
+	address := fmt.Sprintf("%s", wallet.Address())
 
-	ws.Wallets[address] = wallet // Add the wallet to the Wallets map
+	ws.Wallets[address] = wallet
 
-	return address // Return the wallet's address
+	return address
 }
 
-// GetAllAddresses returns a list of all addresses present in Wallets.
 func (ws *Wallets) GetAllAddresses() []string {
 	var addresses []string
 
 	for address := range ws.Wallets {
-		addresses = append(addresses, address) // Append each address to the addresses slice
+		addresses = append(addresses, address)
 	}
 
-	return addresses // Return the list of addresses
+	return addresses
 }
 
-// GetWallet retrieves a wallet using its address.
 func (ws Wallets) GetWallet(address string) Wallet {
-	return *ws.Wallets[address] // Return the wallet corresponding to the given address
+	return *ws.Wallets[address]
 }
 
-// LoadFile reads wallet data from the file and populates the Wallets instance.
-func (ws *Wallets) LoadFile() error {
+func (ws *Wallets) LoadFile(nodeId string) error {
+	walletFile := fmt.Sprintf(walletFile, nodeId)
 	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
-		return err // Return an error if the file doesn't exist
+		return err
 	}
 
 	var wallets Wallets
 
-	fileContent, err := ioutil.ReadFile(walletFile) // Read the content of the wallet file
+	fileContent, err := ioutil.ReadFile(walletFile)
 	if err != nil {
-		return err // Return any error encountered during file reading
+		return err
 	}
 
-	gob.Register(elliptic.P256()) // Register the elliptic curve type for decoding
-	decoder := gob.NewDecoder(bytes.NewReader(fileContent)) // Create a decoder for decoding the file content
-	err = decoder.Decode(&wallets) // Decode the content into the wallets instance
+	gob.Register(elliptic.P256())
+	decoder := gob.NewDecoder(bytes.NewReader(fileContent))
+	err = decoder.Decode(&wallets)
 	if err != nil {
-		return err // Return any error encountered during decoding
+		return err
 	}
 
-	ws.Wallets = wallets.Wallets // Assign the loaded wallets to the Wallets instance
+	ws.Wallets = wallets.Wallets
 
-	return nil // Return nil to indicate success
+	return nil
 }
 
-// SaveFile encodes and saves the Wallets instance to the file.
-func (ws *Wallets) SaveFile() {
-	var content bytes.Buffer // Create a buffer to hold the encoded data
+func (ws *Wallets) SaveFile(nodeId string) {
+	var content bytes.Buffer
+	walletFile := fmt.Sprintf(walletFile, nodeId)
 
-	gob.Register(elliptic.P256()) // Register the elliptic curve type for encoding
+	gob.Register(elliptic.P256())
 
-	encoder := gob.NewEncoder(&content) // Create an encoder for encoding the Wallets instance
-	err := encoder.Encode(ws) // Encode the Wallets instance into the buffer
+	encoder := gob.NewEncoder(&content)
+	err := encoder.Encode(ws)
 	if err != nil {
-		log.Panic(err) // Panic if there's an error during encoding
+		log.Panic(err)
 	}
 
-	err = ioutil.WriteFile(walletFile, content.Bytes(), 0644) // Write the buffer to the wallet data file
+	err = ioutil.WriteFile(walletFile, content.Bytes(), 0644)
 	if err != nil {
-		log.Panic(err) // Panic if there's an error during file writing
+		log.Panic(err)
 	}
 }
